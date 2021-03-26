@@ -1,0 +1,151 @@
+---
+title: "PMLR"
+author: "Prasanna Santhanam"
+date: "3/26/2021"
+output:
+  word_document:
+    toc: yes
+  html_document:
+    fig_caption: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Practical Machine Learing assignment
+
+## Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+The goal of my research project is to be able to predict the manner of exercise. The "classe" variable is the outcome of interest. The five classes are as follows :exactly according to the specification (Class A),throwing the elbows to the front (Class B),lifting the dumbbell only halfway (Class C),lowering the dumbbell only halfway (Class D),throwing the hips to the front (Class E).Two data-sets have been provided, the training and the test set. We have created the following algorithm for prediction
+###Global Environment Creation
+It was done by using the code rm(list = ls()). Then packages were loaded
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+library(gbm)
+library(randomForest)
+```
+
+###Locating the  data
+
+```{r}
+url1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+## Data Pre-processing
+This involved reading the data,partitioning the data 70% as training and 30% as testing set and then cleaning the data
+by removing the non-zero variance variables, the NA values and the string variables
+
+### Reading the Training and testing data 
+
+```{r}
+training <- read.csv(url1)
+testing <- read.csv(url2)
+```
+
+### Create a partition with the training dataset 
+
+```{r}
+inTrain  <- createDataPartition(y =training$classe, p=0.7, list=FALSE)
+TrainSet <- training[inTrain, ]
+TestSet  <- training[-inTrain, ]
+dim(TrainSet)
+dim(TestSet)
+```
+
+###  Cleaning the data
+
+*Remove variables that are mostly NA*
+
+```{r}
+AllNA    <- sapply(TrainSet, function(x) mean(is.na(x))) > 0.95
+TrainSet <- TrainSet[, AllNA==FALSE]
+TestSet  <- TestSet[, AllNA==FALSE]
+dim(TrainSet)
+dim(TestSet)
+```
+
+*Remove variables with Nearly Zero Variance*
+
+```{r}
+NZV <- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[, -NZV]
+TestSet  <- TestSet[, -NZV]
+dim(TrainSet)
+dim(TestSet)
+```
+*Subsetting the data and removing unnecessary variables*
+
+Remove identification only variables (columns 1 to 5)
+
+```{r}
+TrainSet <- TrainSet[, -(1:5)]
+TestSet  <- TestSet[, -(1:5)]
+dim(TestSet)
+```
+*Verify the column names of the training and testing data* 
+
+```{r}
+colnames(TrainSet)
+colnames(TestSet)
+```
+## Random ForestPrediction on Training set and confusionmatrix for the model
+*Model Training*
+```{r}
+set.seed(432)
+controlRF <- trainControl(method="cv", number=3, verboseIter=FALSE)
+modFitRandForest <- train(classe ~ ., data=TrainSet, method="rf",
+                          trControl=controlRF)
+modFitRandForest$finalModel
+```
+*Prediction on Test dataset*
+```{r}
+predictRForest <- predict(modFitRandForest, newdata=TestSet)
+confMatRForest <- confusionMatrix(predictRForest, TestSet$classe)
+confMatRForest
+```
+
+*Plot matrix results*
+```{r}
+plot(confMatRForest$table, col = confMatRForest$byClass, 
+     main = paste("Random Forest - Accuracy =",
+                  round(confMatRForest$overall['Accuracy'], 4)))
+```
+## Generalized Boosting Model
+*Training the model*
+```{r}
+set.seed(432)
+library(gbm)
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modFitGBM  <- train(classe ~ ., data=TrainSet, method = "gbm",
+                    trControl = controlGBM, verbose = FALSE)
+modFitGBM$finalModel
+```
+*Prediction on Test Dataset*
+```{r}
+predictGBM <- predict(modFitGBM, newdata=TestSet)
+confMatGBM <- confusionMatrix(predictGBM, TestSet$classe)
+confMatGBM
+```
+*Plot matrix results*
+```{r}
+plot(confMatGBM$table, col = confMatGBM$byClass, 
+     main = paste("GBM - Accuracy =", round(confMatGBM$overall['Accuracy'], 4)))
+```
+**Apply Random Forest to Testing Data**
+```{r}
+predictTEST <- predict(modFitRandForest, newdata=testing)
+predictTEST
+```
+
+*** THE END ***
+
